@@ -1,6 +1,6 @@
 export MODEL_NAME="/home/zhangjiaju/deeplearning/VideoX-Fun/models/Wan2.1-Fun-V1.1-1.3B-control"
 export DATASET_NAME="/home/zhangjiaju/deeplearning/VideoX-Fun/datasets/internal_datasets"
-export DATASET_META_NAME="/home/zhangjiaju/deeplearning/VideoX-Fun/datasets/internal_datasets/metadata_image.json"
+export DATASET_META_NAME="/home/zhangjiaju/deeplearning/VideoX-Fun/datasets/internal_datasets/metadata_video.json"
 export NCCL_IB_DISABLE=1
 export NCCL_P2P_DISABLE=1
 NCCL_DEBUG=INFO
