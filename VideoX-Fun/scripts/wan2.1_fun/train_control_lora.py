@@ -52,7 +52,6 @@ from torch.utils.data import RandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from torchvision import transforms
 from tqdm.auto import tqdm
-from transformers import AutoTokenizer
 from transformers.utils import ContextManagers
 
 import datasets
@@ -82,6 +81,8 @@ from videox_fun.utils.lora_utils import (create_network, merge_lora,
 from videox_fun.utils.utils import (get_image_to_video_latent,
                                     get_video_to_video_latent,
                                     save_videos_grid)
+
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoModel
 
 if is_wandb_available():
     import wandb
@@ -721,7 +722,7 @@ def main():
 
     # Get Tokenizer
     tokenizer = AutoTokenizer.from_pretrained(
-        os.path.join(args.pretrained_model_name_or_path, config['text_encoder_kwargs'].get('tokenizer_subpath', 'tokenizer')),
+        "/home/Qwen3-8B"
     )
 
     def deepspeed_zero_init_disabled_context_manager():
@@ -745,12 +746,20 @@ def main():
     # across multiple gpus and only UNet2DConditionModel will get ZeRO sharded.
     with ContextManagers(deepspeed_zero_init_disabled_context_manager()):
         # Get Text encoder
-        text_encoder = WanT5EncoderModel.from_pretrained(
-            os.path.join(args.pretrained_model_name_or_path, config['text_encoder_kwargs'].get('text_encoder_subpath', 'text_encoder')),
-            additional_kwargs=OmegaConf.to_container(config['text_encoder_kwargs']),
-            low_cpu_mem_usage=True,
-            torch_dtype=weight_dtype,
-        )
+
+        text_encoder = AutoModel.from_pretrained(
+            "/home/Qwen3-8B",
+            torch_dtype="auto",
+            device_map="auto",
+            )
+        
+        # text_encoder = WanT5EncoderModel.from_pretrained(
+        #     os.path.join(args.pretrained_model_name_or_path, config['text_encoder_kwargs'].get('text_encoder_subpath', 'text_encoder')),
+        #     additional_kwargs=OmegaConf.to_container(config['text_encoder_kwargs']),
+        #     low_cpu_mem_usage=True,
+        #     torch_dtype=weight_dtype,
+        # )··
+
         text_encoder = text_encoder.eval()
         # Get Vae
         vae = AutoencoderKLWan.from_pretrained(
@@ -1349,7 +1358,7 @@ def main():
     idx_sampling = DiscreteSampling(args.train_sampling_steps, uniform_sampling=args.uniform_sampling)
 
     for epoch in range(first_epoch, args.num_train_epochs):
-        print(0)
+
         train_loss = 0.0
         batch_sampler.sampler.generator = torch.Generator().manual_seed(args.seed + epoch)
         for step, batch in enumerate(train_dataloader):
@@ -1366,7 +1375,7 @@ def main():
                     gif_name = '-'.join(text.replace('/', '').split()[:10]) if not text == '' else f'{global_step}-{idx}'
                     save_videos_grid(pixel_value, f"{args.output_dir}/sanity_check/{gif_name[:10]}.gif", rescale=True)
                     save_videos_grid(control_pixel_value, f"{args.output_dir}/sanity_check/{gif_name[:10]}_control.gif", rescale=True)
-                print(0.1)
+
                 if args.train_mode != "control":
                     ref_pixel_values = batch["ref_pixel_values"].cpu()
                     ref_pixel_values = rearrange(ref_pixel_values, "b f c h w -> b c f h w")
@@ -1374,7 +1383,7 @@ def main():
                         ref_pixel_value = ref_pixel_value[None, ...]
                         gif_name = '-'.join(text.replace('/', '').split()[:10]) if not text == '' else f'{global_step}-{idx}'
                         save_videos_grid(ref_pixel_value, f"{args.output_dir}/sanity_check/{gif_name[:10]}_ref.gif", rescale=True)
-            print(0.2)
+
             with accelerator.accumulate(transformer3d):
                 # Convert images to latent space
                 pixel_values = batch["pixel_values"].to(weight_dtype)
@@ -1404,7 +1413,7 @@ def main():
                             batch['encoder_attention_mask'] = torch.tile(batch['encoder_attention_mask'], (2, 1))
                         else:
                             batch['text'] = batch['text'] * 2
-                print(0.5)
+
                 if args.train_mode != "control":
                     ref_pixel_values = batch["ref_pixel_values"].to(weight_dtype)
                     clip_pixel_values = batch["clip_pixel_values"]
@@ -1419,7 +1428,7 @@ def main():
                             clip_pixel_values = torch.tile(clip_pixel_values, (2, 1, 1, 1))
                             ref_pixel_values = torch.tile(ref_pixel_values, (2, 1, 1, 1, 1))
                             clip_idx = torch.tile(clip_idx, (2,))
-                print(1)
+
                 if args.random_frame_crop:
                     def _create_special_list(length):
                         if length == 1:
@@ -1592,8 +1601,17 @@ def main():
                         prompt_attention_mask = prompt_ids.attention_mask
 
                         seq_lens = prompt_attention_mask.gt(0).sum(dim=1).long()
-                        prompt_embeds = text_encoder(text_input_ids.to(latents.device), attention_mask=prompt_attention_mask.to(latents.device))[0]
+
+
+
+                        prompt_embeds = text_encoder(text_input_ids.to(latents.device), attention_mask=prompt_attention_mask.to(latents.device))
+            
+                        prompt_embeds = prompt_embeds.last_hidden_state
+                        # print(prompt_embeds.shape)
+                        # exit()
                         prompt_embeds = [u[:v] for u, v in zip(prompt_embeds, seq_lens)]
+
+
 
                 if args.low_vram and not args.enable_text_encoder_in_dataloader:
                     text_encoder.to('cpu')
