@@ -82,6 +82,7 @@ from videox_fun.utils.lora_utils import (create_network, merge_lora,
 from videox_fun.utils.utils import (get_image_to_video_latent,
                                     get_video_to_video_latent,
                                     save_videos_grid)
+from modelscope import AutoModelForCausalLM, AutoTokenizer, AutoModel
 
 if is_wandb_available():
     import wandb
@@ -616,6 +617,11 @@ def parse_args():
         default=1.29,
         help="Scale of mode weighting scheme. Only effective when using the `'mode'` as the `weighting_scheme`.",
     )
+    parser.add_argument(
+        "--local-rank",
+        type=int,
+        default=0,
+    )
 
     args = parser.parse_args()
     env_local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -716,8 +722,11 @@ def main():
     )
 
     # Get Tokenizer
+    # tokenizer = AutoTokenizer.from_pretrained(
+    #     os.path.join(args.pretrained_model_name_or_path, config['text_encoder_kwargs'].get('tokenizer_subpath', 'tokenizer')),
+    # )
     tokenizer = AutoTokenizer.from_pretrained(
-        os.path.join(args.pretrained_model_name_or_path, config['text_encoder_kwargs'].get('tokenizer_subpath', 'tokenizer')),
+        "/data/wan2.1basecode/VideoX-Fun/models/Qwen3-8B"
     )
 
     def deepspeed_zero_init_disabled_context_manager():
@@ -741,12 +750,23 @@ def main():
     # across multiple gpus and only UNet2DConditionModel will get ZeRO sharded.
     with ContextManagers(deepspeed_zero_init_disabled_context_manager()):
         # Get Text encoder
-        text_encoder = WanT5EncoderModel.from_pretrained(
-            os.path.join(args.pretrained_model_name_or_path, config['text_encoder_kwargs'].get('text_encoder_subpath', 'text_encoder')),
-            additional_kwargs=OmegaConf.to_container(config['text_encoder_kwargs']),
-            low_cpu_mem_usage=True,
-            torch_dtype=weight_dtype,
-        )
+
+        text_encoder = AutoModel.from_pretrained(
+            "/data/wan2.1basecode/VideoX-Fun/models/Qwen3-8B",
+            torch_dtype="auto",
+            # device_map="auto",
+            )
+
+            
+        # text_encoder = WanT5EncoderModel.from_pretrained(
+        #     os.path.join(args.pretrained_model_name_or_path, config['text_encoder_kwargs'].get('text_encoder_subpath', 'text_encoder')),
+        #     additional_kwargs=OmegaConf.to_container(config['text_encoder_kwargs']),
+        #     low_cpu_mem_usage=True,
+        #     torch_dtype=weight_dtype,
+        # )
+        for param in text_encoder.parameters():
+            param.requires_grad = False
+
         text_encoder = text_encoder.eval()
         # Get Vae
         vae = AutoencoderKLWan.from_pretrained(
@@ -1260,9 +1280,8 @@ def main():
                 new_examples['encoder_attention_mask'] = prompt_ids.attention_mask
                 new_examples['encoder_hidden_states'] = encoder_hidden_states
 
-            return new_examples
-        
-        # DataLoaders creation:
+            return new_examples        
+
         train_dataloader = torch.utils.data.DataLoader(
             train_dataset,
             batch_sampler=batch_sampler,
@@ -1286,6 +1305,7 @@ def main():
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
+
     if args.max_train_steps is None:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
@@ -1313,6 +1333,8 @@ def main():
         clip_image_encoder.to(accelerator.device if not args.low_vram else "cpu", dtype=weight_dtype)
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
+    print("len(train_dataloader) :", len(train_dataloader))
+    print("args.gradient_accumulation_steps:",  args.gradient_accumulation_steps)
     num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
     if overrode_max_train_steps:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch

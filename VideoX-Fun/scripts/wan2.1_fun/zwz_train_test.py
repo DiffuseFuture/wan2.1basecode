@@ -24,7 +24,7 @@ import pickle
 import random
 import shutil
 import sys
-from datetime import datetime
+
 import accelerate
 import diffusers
 import numpy as np
@@ -443,7 +443,7 @@ def parse_args():
     parser.add_argument(
         "--logging_dir",
         type=str,
-        default="/nas/log/model_log",
+        default="logs",
         help=(
             "[TensorBoard](https://www.tensorflow.org/tensorboard) log directory. Will default to"
             " *output_dir/runs/**CURRENT_DATETIME_HOSTNAME***."
@@ -697,29 +697,11 @@ def parse_args():
 
     return args
 
-class Logger(object):
-    def __init__(self, filename_prefix="/nas/log/terminal_log/output"):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.filename = f"{filename_prefix}_{timestamp}.txt"
-        self.terminal = sys.stdout
-        self.log = open(self.filename, "a")  
-
-    def write(self, message):
-        self.terminal.write(message)
-        self.log.write(message)
-
-    def flush(self):
-        self.log.flush()
-
-    def __del__(self):
-        self.log.close()
 
 def main():
-    if not os.path.exists("/nas/log/terminal_log"):
-        os.makedirs("/nas/log/terminal_log")
-    
     args = parse_args()
     # print(args.use_deepspeed)
+
     # exit
     args.use_deepspeed - True
     if args.report_to == "wandb" and args.hub_token is not None:
@@ -737,7 +719,7 @@ def main():
                 " use `--variant=non_ema` instead."
             ),
         )
-    logging_dir = args.logging_dir
+    logging_dir = os.path.join(args.output_dir, args.logging_dir)
 
     config = OmegaConf.load(args.config_path)
     accelerator_project_config = ProjectConfiguration(project_dir=args.output_dir, logging_dir=logging_dir)
@@ -757,8 +739,7 @@ def main():
         print("DeepSpeed is not enabled.")
     if accelerator.is_main_process:
         writer = SummaryWriter(log_dir=logging_dir)
-        sys.stdout = Logger("/nas/log/terminal_log/output")  
-        sys.stderr = Logger("/nas/log/terminal_log/error")  
+
     # Make one log on every process with the configuration for debugging.
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
@@ -835,31 +816,31 @@ def main():
     # `from_pretrained` So CLIPTextModel and AutoencoderKL will not enjoy the parameter sharding
     # across multiple gpus and only UNet2DConditionModel will get ZeRO sharded.
     with ContextManagers(deepspeed_zero_init_disabled_context_manager()):
-        # Get Text encoder
-        # text_encoder = WanT5EncoderModel.from_pretrained(
-        #     os.path.join(args.pretrained_model_name_or_path, config['text_encoder_kwargs'].get('text_encoder_subpath', 'text_encoder')),
-        #     additional_kwargs=OmegaConf.to_container(config['text_encoder_kwargs']),
-        #     low_cpu_mem_usage=True,
-        #     torch_dtype=weight_dtype,
-        # )
-
-        text_encoder = AutoModel.from_pretrained(
-            "/data/wan2.1basecode/VideoX-Fun/models/Qwen3-8B",
-            torch_dtype="auto",
-            # device_map="auto",
-            )
-
-        for param in text_encoder.parameters():
-            param.requires_grad = False
-
-            
-        text_encoder = text_encoder.eval()
         # Get Vae
         vae = AutoencoderKLWan.from_pretrained(
             os.path.join(args.pretrained_model_name_or_path, config['vae_kwargs'].get('vae_subpath', 'vae')),
             additional_kwargs=OmegaConf.to_container(config['vae_kwargs']),
         )
-            
+    # Get Text encoder
+    # text_encoder = WanT5EncoderModel.from_pretrained(
+    #     os.path.join(args.pretrained_model_name_or_path, config['text_encoder_kwargs'].get('text_encoder_subpath', 'text_encoder')),
+    #     additional_kwargs=OmegaConf.to_container(config['text_encoder_kwargs']),
+    #     low_cpu_mem_usage=True,
+    #     torch_dtype=weight_dtype,
+    # )
+
+    text_encoder = AutoModel.from_pretrained(
+        "/data/wan2.1basecode/VideoX-Fun/models/Qwen3-8B",
+        torch_dtype="auto",
+        # device_map="auto",
+        )
+
+    for param in text_encoder.parameters():
+        param.requires_grad = False
+
+        
+    text_encoder = text_encoder.eval()        
+
     # Get Transformer
     transformer3d = WanTransformer3DModel.from_pretrained(
         os.path.join(args.pretrained_model_name_or_path, config['transformer_additional_kwargs'].get('transformer_subpath', 'transformer')),
@@ -1337,6 +1318,10 @@ def main():
         transformer3d, optimizer, train_dataloader, lr_scheduler
     )
 
+    text_encoder = accelerator.prepare(
+        text_encoder
+    )
+
     if args.use_ema:
         ema_transformer3d.to(accelerator.device)
 
@@ -1379,7 +1364,6 @@ def main():
     logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
     logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
-    # exit()
     global_step = 0
     first_epoch = 0
 

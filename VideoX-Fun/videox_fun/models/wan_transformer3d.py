@@ -815,10 +815,17 @@ class WanTransformer3DModel(ModelMixin, ConfigMixin, FromOriginalModelMixin):
         else:
             self.control_adapter = None
 
-        if add_ref_conv:
-            self.ref_conv = nn.Conv2d(in_dim_ref_conv, dim, kernel_size=patch_size[1:], stride=patch_size[1:])
-        else:
-            self.ref_conv = None
+        # if add_ref_conv:
+        #     self.ref_conv = nn.Conv2d(in_dim_ref_conv, dim, kernel_size=patch_size[1:], stride=patch_size[1:])
+        # else:
+        #     self.ref_conv = None
+
+        self.ref_conv = nn.Conv2d(
+        in_dim_ref_conv, 
+        dim, 
+        kernel_size=patch_size[1:], 
+        stride=patch_size[1:]
+        ) if add_ref_conv else nn.Identity()  
 
         self.teacache = None
         self.gradient_checkpointing = False
@@ -922,7 +929,9 @@ class WanTransformer3DModel(ModelMixin, ConfigMixin, FromOriginalModelMixin):
 
         if y is not None:
             x = [torch.cat([u, v], dim=0) for u, v in zip(x, y)]
-
+        
+        # print(x[0].shape,'xshape')
+        # print(self.patch_embedding,'func')
         # embeddings
         x = [self.patch_embedding(u.unsqueeze(0)) for u in x]
         # add control adapter

@@ -1,11 +1,12 @@
 export MODEL_NAME="/data/wan2.1basecode/VideoX-Fun/models/Wan2.1-Fun-V1.1-1.3B-Control"
-export DATASET_NAME="/data/wan2.1basecode/VideoX-Fun/datasets/internal_datasets"
+export DATASET_NAME="datasets/internal_datasets/"
 export DATASET_META_NAME="/data/wan2.1basecode/VideoX-Fun/datasets/internal_datasets/metadata.json"
 export NCCL_IB_DISABLE=1
 export NCCL_P2P_DISABLE=1
 NCCL_DEBUG=INFO
 
-accelerate launch --mixed_precision="bf16" scripts/wan2.1_fun/train_control.py \
+# When train model with multi machines, use "--config_file accelerate.yaml" instead of "--mixed_precision='bf16'".
+accelerate launch --mixed_precision="bf16" scripts/wan2.1_fun/train_control_stage1.py \
   --config_path="config/wan2.1/wan_civitai.yaml" \
   --pretrained_model_name_or_path=$MODEL_NAME \
   --train_data_dir=$DATASET_NAME \
@@ -21,7 +22,9 @@ accelerate launch --mixed_precision="bf16" scripts/wan2.1_fun/train_control.py \
   --dataloader_num_workers=8 \
   --num_train_epochs=100 \
   --checkpointing_steps=50 \
-  --learning_rate=1e-04 \
+  --learning_rate=2e-05 \
+  --lr_scheduler="constant_with_warmup" \
+  --lr_warmup_steps=100 \
   --seed=42 \
   --output_dir="output_dir" \
   --gradient_checkpointing \
@@ -34,6 +37,7 @@ accelerate launch --mixed_precision="bf16" scripts/wan2.1_fun/train_control.py \
   --training_with_video_token_length \
   --enable_bucket \
   --uniform_sampling \
-  --train_mode="control_ref" \
+  --low_vram \
+  --train_mode="control_object" \
   --control_ref_image="first_frame" \
-  --low_vram 
+  --trainable_modules "."

@@ -1,6 +1,6 @@
 export MODEL_NAME="/data/wan2.1basecode/VideoX-Fun/models/Wan2.1-Fun-V1.1-14B-InP"
-export DATASET_NAME= None
-export DATASET_META_NAME="/data/wan2.1basecode/VideoX-Fun/datasets/internal_datasets/large_output.json"
+export DATASET_NAME="datasets/internal_datasets/"
+export DATASET_META_NAME="/data/wan2.1basecode/VideoX-Fun/datasets/internal_datasets/metadata.json"
 export NCCL_IB_DISABLE=1
 export NCCL_P2P_DISABLE=1
 NCCL_DEBUG=INFO
@@ -36,8 +36,6 @@ accelerate launch --zero_stage 2 --use_deepspeed --deepspeed_config_file config/
   --training_with_video_token_length \
   --enable_bucket \
   --uniform_sampling \
-  --low_vram \
-  --use_deepspeed \
   --train_mode="inpaint" \
   --trainable_modules "."
 

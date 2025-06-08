@@ -24,6 +24,8 @@ from ..models import (AutoencoderKLWan, AutoTokenizer, CLIPModel,
 from ..utils.fm_solvers import (FlowDPMSolverMultistepScheduler,
                                 get_sampling_sigmas)
 from ..utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
+from modelscope import AutoModelForCausalLM, AutoTokenizer, AutoModel
+
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -168,7 +170,7 @@ class WanFunInpaintPipeline(DiffusionPipeline):
     def __init__(
         self,
         tokenizer: AutoTokenizer,
-        text_encoder: WanT5EncoderModel,
+        text_encoder: AutoModel,
         vae: AutoencoderKLWan,
         transformer: WanTransformer3DModel,
         clip_image_encoder: CLIPModel,
