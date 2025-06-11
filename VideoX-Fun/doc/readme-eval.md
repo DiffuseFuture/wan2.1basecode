@@ -13,6 +13,6 @@
 + step 2: 对生成结果进行评估
 
 
-    python eval_benchmark.py --root_predict ./examples-2/pred
+    python eval_benchmark.py
 
 生成结果会被保存在eval_result.json文件中。
