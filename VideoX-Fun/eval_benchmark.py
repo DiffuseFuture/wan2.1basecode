@@ -12,10 +12,23 @@ only_final = True
 import json
 result = {}
 
+import argparse
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="示例脚本参数解析")
+
+    # 添加参数示例
+    parser.add_argument(
+        "--root_predict", 
+        type=str, 
+        default="./examples-2/pred",
+    )
+    return parser.parse_args()
+
+args = parse_args()
 # Example usage
 if __name__ == "__main__":
-    dataset = VideoPairDataset(root_predict="./examples-2/pred", sequence_len=15)
+    dataset = VideoPairDataset(root_predict=args.root_predict, sequence_len=15)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=0)
 
     for videos1, videos2 in dataloader:
@@ -26,6 +39,7 @@ if __name__ == "__main__":
         result['ssim'] = calculate_ssim(videos1, videos2, only_final=only_final)
         result['psnr'] = calculate_psnr(videos1, videos2, only_final=only_final)
         result['lpips'] = calculate_lpips(videos1, videos2, device, only_final=only_final)
-
-        print(json.dumps(result, indent=4))
-        break
+    
+    # 每段视频的metric会被保存在result.json中
+    with open("eval_result.json","w") as f:
+        f.write(json.dumps(result, indent=4))
