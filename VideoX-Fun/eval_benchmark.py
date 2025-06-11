@@ -10,8 +10,6 @@ device = torch.device("cuda")
 only_final = True
 
 import json
-result = {}
-
 import argparse
 
 def parse_args():
@@ -21,17 +19,25 @@ def parse_args():
     parser.add_argument(
         "--root_predict", 
         type=str, 
-        default="./examples-2/pred",
+        default="./samples/wan-videos-fun-i2v/",
+    )
+    parser.add_argument(
+        "--root_benchmark", 
+        type=str, 
+        default="./benchmark/videos/",
     )
     return parser.parse_args()
 
 args = parse_args()
 # Example usage
 if __name__ == "__main__":
-    dataset = VideoPairDataset(root_predict=args.root_predict, sequence_len=15)
+    dataset = VideoPairDataset(root_benchmark=args.root_benchmark,root_predict=args.root_predict, sequence_len=15)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=0)
 
+    results = []
     for videos1, videos2 in dataloader:
+        result = {}
+
         # inputs and targets are [batch_size, sequence_len, 64, 64, 3]
         print(videos1.shape, videos2.shape)
 
@@ -39,7 +45,8 @@ if __name__ == "__main__":
         result['ssim'] = calculate_ssim(videos1, videos2, only_final=only_final)
         result['psnr'] = calculate_psnr(videos1, videos2, only_final=only_final)
         result['lpips'] = calculate_lpips(videos1, videos2, device, only_final=only_final)
+        results.append(result)
     
     # 每段视频的metric会被保存在result.json中
     with open("eval_result.json","w") as f:
-        f.write(json.dumps(result, indent=4))
+        f.write(json.dumps(results, indent=4))
