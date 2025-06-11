@@ -12,7 +12,7 @@ for item in test_data:
     vname = file_path.split("/")[-1]
     prompt = item["text"]
 
-    command = "torchrun --nproc-per-node=2 examples/wan2.1_fun/predict_i2v_benchmark.py --ref \"/workspace/VideoX-Fun/benchmark/start_frames/{}\" --prompt \"{}\" ".format(vname[:-4]+".jpg",str(prompt))
+    command = "torchrun --nproc-per-node=2 examples/wan2.1_fun/predict_i2v_benchmark.py --ref \"./benchmark/start_frames/{}\" --prompt \"{}\" ".format(vname[:-4]+".jpg",str(prompt))
     # command = "torchrun --nproc-per-node=2 examples/wan2.1_fun/predict_i2v.py"
 
     print(command)
