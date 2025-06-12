@@ -17,7 +17,7 @@ from ..models import (AutoencoderKLWan, AutoTokenizer,
 from ..utils.fm_solvers import (FlowDPMSolverMultistepScheduler,
                                 get_sampling_sigmas)
 from ..utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
-from modelscope import AutoModelForCausalLM, AutoTokenizer, AutoModel
+# from modelscope import AutoModelForCausalLM, AutoTokenizer, AutoModel
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -125,7 +125,7 @@ class WanFunPipeline(DiffusionPipeline):
     def __init__(
         self,
         tokenizer: AutoTokenizer,
-        text_encoder: AutoModel,
+        text_encoder: WanT5EncoderModel,
         vae: AutoencoderKLWan,
         transformer: WanTransformer3DModel,
         scheduler: FlowMatchEulerDiscreteScheduler,
