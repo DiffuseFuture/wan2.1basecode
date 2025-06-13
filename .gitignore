@@ -6,3 +6,6 @@ VideoX-Fun/scripts/wan2.1_fun/output_dir/
 VideoX-Fun/scripts/wan2.1_fun/output_dir_save1/
 VideoX-Fun/test/
 */.vscode/*
+*.pyc
+**/__pycache__/**
+.vscode*
