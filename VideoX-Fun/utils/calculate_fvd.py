@@ -13,7 +13,7 @@ def trans(x):
 
     return x
 
-def calculate_fvd(videos1, videos2, device, method='styleganv', only_final=False):
+def calculate_fvd(videos1, videos2, device, method='videogpt', only_final=False):
 
     if method == 'styleganv':
         from evaluation.fvd.styleganv.fvd import get_fvd_feats, frechet_distance, load_i3d_pretrained
