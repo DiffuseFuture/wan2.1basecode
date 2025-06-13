@@ -50,3 +50,18 @@ if __name__ == "__main__":
     # 每段视频的metric会被保存在result.json中
     with open("eval_result.json","w") as f:
         f.write(json.dumps(results, indent=4))
+    
+    fvd = 0
+    ssim = 0
+    psnr = 0
+    lpips = 0
+    for item in results:
+        print(item)
+        print(item["fvd"]["value"][0])
+        fvd += item["fvd"]["value"][0]
+        ssim += item["ssim"]["value"][0]
+        psnr += item['psnr']["value"][0]
+        lpips += item["lpips"]["value"][0]
+    
+    print("Total Metrics: fvd: {}, ssim: {}, psnr: {}, lpips: {}".format(fvd/len(results),ssim/len(results),psnr/len(results),lpips/len(results)))
+
