@@ -734,7 +734,7 @@ def main():
     # )
 
     gradient_accumulation_plugin = GradientAccumulationPlugin(num_steps=args.gradient_accumulation_steps,
-        sync_each_batch: True
+        sync_each_batch=True
     )
 
     accelerator = Accelerator(
