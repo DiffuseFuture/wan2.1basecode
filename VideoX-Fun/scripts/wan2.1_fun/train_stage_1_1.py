@@ -57,6 +57,8 @@ from torchvision import transforms
 from tqdm.auto import tqdm
 # from transformers import AutoTokenizer
 from transformers.utils import ContextManagers
+from accelerate.utils import GradientAccumulationPlugin
+
 
 import datasets
 
@@ -724,12 +726,25 @@ def main():
     config = OmegaConf.load(args.config_path)
     accelerator_project_config = ProjectConfiguration(project_dir=args.output_dir, logging_dir=logging_dir)
 
+    # accelerator = Accelerator(
+    #     gradient_accumulation_steps=args.gradient_accumulation_steps,
+    #     mixed_precision=args.mixed_precision,
+    #     log_with=args.report_to,
+    #     project_config=accelerator_project_config,
+    # )
+
+    gradient_accumulation_plugin = GradientAccumulationPlugin(num_steps=args.gradient_accumulation_steps,
+        sync_each_batch: True
+    )
+
     accelerator = Accelerator(
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        gradient_accumulation_plugin=gradient_accumulation_plugin,
         mixed_precision=args.mixed_precision,
         log_with=args.report_to,
         project_config=accelerator_project_config,
     )
+
+
     deepspeed_plugin = accelerator.state.deepspeed_plugin
     if deepspeed_plugin is not None:
         zero_stage = int(deepspeed_plugin.zero_stage)
