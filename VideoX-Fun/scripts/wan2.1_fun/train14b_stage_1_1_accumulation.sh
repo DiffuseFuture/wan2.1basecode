@@ -24,7 +24,7 @@ accelerate launch --num_machines 2 --num_processes 16 --machine_rank ${RANK} --m
   --train_data_meta=$DATASET_META_NAME \
   --image_sample_size=960 \
   --video_sample_size=256 \
-  --token_sample_size=960 \
+  --token_sample_size=768 \
   --video_sample_stride=2 \
   --video_sample_n_frames=81 \
   --train_batch_size=1 \
