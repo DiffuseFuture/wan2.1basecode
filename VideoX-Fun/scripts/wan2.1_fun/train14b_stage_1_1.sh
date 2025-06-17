@@ -25,7 +25,7 @@ accelerate launch --num_machines 2 --num_processes 16 --machine_rank ${RANK} --m
   --train_data_dir=$DATASET_NAME \
   --train_data_meta=$DATASET_META_NAME \
   --image_sample_size=1024 \
-  --video_sample_size=256 \
+  --video_sample_size=960 \
   --token_sample_size=512 \
   --video_sample_stride=2 \
   --video_sample_n_frames=81 \
@@ -51,7 +51,8 @@ accelerate launch --num_machines 2 --num_processes 16 --machine_rank ${RANK} --m
   --enable_bucket \
   --uniform_sampling \
   --train_mode="inpaint" \
-  --trainable_modules "."
+  --trainable_modules "."\
+  --resume_from_checkpoint="latest"
 
 # # Training command for T2V
 # export MODEL_NAME="models/Diffusion_Transformer/Wan2.1-Fun-14B-InP"

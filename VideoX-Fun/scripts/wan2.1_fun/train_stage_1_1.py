@@ -82,6 +82,9 @@ from videox_fun.utils.discrete_sampler import DiscreteSampling
 from videox_fun.utils.utils import get_image_to_video_latent, save_videos_grid
 from modelscope import AutoModelForCausalLM, AutoTokenizer, AutoModel
 
+import time
+
+
 if is_wandb_available():
     import wandb
 
@@ -1437,6 +1440,7 @@ def main():
         batch_sampler.sampler.generator = torch.Generator().manual_seed(args.seed + epoch)
         for step, batch in enumerate(train_dataloader):
             # Data batch sanity check
+            print(batch['pixel_values'].shape, '=====pixel_shape') 
             if epoch == first_epoch and step == 0:
                 pixel_values, texts = batch['pixel_values'].cpu(), batch['text']
                 pixel_values = rearrange(pixel_values, "b f c h w -> b c f h w")
@@ -1452,7 +1456,7 @@ def main():
                         pixel_value = pixel_value[None, ...]
                         Image.fromarray(np.uint8(clip_pixel_value)).save(f"{args.output_dir}/sanity_check/clip_{gif_name[:10] if not text == '' else f'{global_step}-{idx}'}.png")
                         save_videos_grid(pixel_value, f"{args.output_dir}/sanity_check/mask_{gif_name[:10] if not text == '' else f'{global_step}-{idx}'}.gif", rescale=True)
-
+            print(time.strftime("%Y-%m-%d %H:%M:%S"), 'start')  # 输出示例: 2024-07-10 16:30:45
             with accelerator.accumulate(transformer3d):
                 # Convert images to latent space
                 pixel_values = batch["pixel_values"].to(weight_dtype)
@@ -1562,7 +1566,9 @@ def main():
                         clip_image_encoder.to(accelerator.device)
                     if not args.enable_text_encoder_in_dataloader:
                         text_encoder.to("cpu")
-
+                print(time.strftime("%Y-%m-%d %H:%M:%S"),'load_data_over')  # 输出示例: 2024-07-10 16:30:45
+                print(pixel_values.shape, 'before vae')
+                # exit()
                 with torch.no_grad():
                     # This way is quicker when batch grows up
                     def _batch_encode_vae(pixel_values):
@@ -1733,9 +1739,10 @@ def main():
                 # Gather the losses across all processes for logging (if we use distributed training).
                 avg_loss = accelerator.gather(loss.repeat(args.train_batch_size)).mean()
                 train_loss += avg_loss.item() / args.gradient_accumulation_steps
-
+                print(time.strftime("%Y-%m-%d %H:%M:%S"),'inference over')  # 输出示例: 2024-07-10 16:30:45
                 # Backpropagate
                 accelerator.backward(loss)
+                print(time.strftime("%Y-%m-%d %H:%M:%S"), 'calculate loss over')  # 输出示例: 2024-07-10 16:30:45
                 args.use_deepspeed = True
                 if accelerator.sync_gradients:
                     if not args.use_deepspeed:
@@ -1761,8 +1768,9 @@ def main():
                         writer.add_scalar(f'gradients/actual_max_grad_norm', actual_max_grad_norm, global_step=global_step)
                 optimizer.step()
                 lr_scheduler.step()
+                print(time.strftime("%Y-%m-%d %H:%M:%S"),'optim over')  # 输出示例: 2024-07-10 16:30:45
                 optimizer.zero_grad()
-
+                # exit()
             # Checks if the accelerator has performed an optimization step behind the scenes
             if accelerator.sync_gradients:
 
