@@ -49,4 +49,5 @@ accelerate launch --num_machines 2 --num_processes 16 --machine_rank ${RANK} --m
   --enable_bucket \
   --uniform_sampling \
   --train_mode="inpaint" \
-  --trainable_modules "."
+  --trainable_modules "." \
+  --low_vram
