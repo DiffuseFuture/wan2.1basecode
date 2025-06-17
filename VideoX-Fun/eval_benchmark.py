@@ -19,12 +19,12 @@ def parse_args():
     parser.add_argument(
         "--root_predict", 
         type=str, 
-        default="./samples/wan-videos-fun-i2v/",
+        default="./VideoX-Fun/samples/wan-videos-fun-i2v/",
     )
     parser.add_argument(
         "--root_benchmark", 
         type=str, 
-        default="./benchmark/videos/",
+        default="./VideoX-Fun/benchmark/videos/",
     )
     return parser.parse_args()
 
