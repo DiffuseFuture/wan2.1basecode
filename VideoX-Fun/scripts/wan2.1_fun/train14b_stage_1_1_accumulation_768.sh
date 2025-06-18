@@ -37,7 +37,7 @@ accelerate launch --num_machines 2 --num_processes 16 --machine_rank ${RANK} --m
   --lr_scheduler="constant_with_warmup" \
   --lr_warmup_steps=100 \
   --seed=42 \
-  --output_dir="/nas/accumulation16" \
+  --output_dir="/nas/accumulation16_768" \
   --gradient_checkpointing \
   --mixed_precision="bf16" \
   --adam_weight_decay=3e-2 \
