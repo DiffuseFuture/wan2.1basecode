@@ -31,7 +31,7 @@ accelerate launch --num_machines 2 --num_processes 16 --machine_rank ${RANK} --m
   --video_sample_n_frames=81 \
   --train_batch_size=1 \
   --video_repeat=1 \
-  --gradient_accumulation_steps=4 \
+  --gradient_accumulation_steps=1 \
   --dataloader_num_workers=8 \
   --num_train_epochs=100 \
   --checkpointing_steps=100 \
