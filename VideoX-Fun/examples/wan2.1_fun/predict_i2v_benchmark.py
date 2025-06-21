@@ -75,7 +75,7 @@ enable_riflex       = False
 riflex_k            = 6
 
 # Config and model path
-config_path         = "VideoX-Fun/config/wan2.1/wan_civitai.yaml"
+config_path         = "config/wan2.1/wan_civitai.yaml"
 # model path
 model_name          = "/data/wan2.1basecode/VideoX-Fun/models/Wan2.1-Fun-V1.1-14B-InP"
 
