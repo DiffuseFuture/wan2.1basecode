@@ -325,7 +325,7 @@ def run_once(pipeline,prompt="",validation_image_start=""):
 
 import json
 if __name__ == "__main__":
-    f = open("./VideoX-Fun/benchmark/test.json","r")
+    f = open("/data/jiangxx/wan2.1basecode/VideoX-Fun/benchmark/test.json", "r")
     data = f.read()
     test_data = json.loads(data)
     sorted_data = sorted(test_data, key=lambda x: x["file_path"])
@@ -336,5 +336,5 @@ if __name__ == "__main__":
         prompt = item["text"]
         
         print("==============Processing {}============".format(vname))
-        run_once(pipeline,prompt=prompt,validation_image_start="./VideoX-Fun/benchmark/start_frames/{}".format(vname[:-4]+".jpg"))
+        run_once(pipeline, prompt=prompt, validation_image_start="/data/jiangxx/wan2.1basecode/VideoX-Fun/benchmark/start_frames/{}".format(vname[:-4]+".jpg"))
 
