@@ -347,8 +347,9 @@ def run_once(pipeline, control_video="", ref_image=""):
 
 def main():
     control_videos = [f"/data/jiangxx/samples/control_videos/{i}_control.mp4" for i in range(1, 11, 1)]
-    # n.jpg 或者 n.png
-    ref_images = [f"/data/jiangxx/samples/ref_images/{i}.*" for i in range(1, 11, 1)]
+    # 1/3/4.jpg 或者 2/5/6/.../10.png
+    ref_images = [f"/data/jiangxx/samples/ref_images/{i}.jpg" for i in [1,3,4] ] \
+        + [f"/data/jiangxx/samples/ref_images/{i}.png" for i in [2, 5, 6, 7, 8, 9, 10] ]
     # ref_images = args.ref_images
     
     print(f"开始批量推理，控制视频数量: {len(control_videos)}, 参考图片数量: {len(ref_images)}")
