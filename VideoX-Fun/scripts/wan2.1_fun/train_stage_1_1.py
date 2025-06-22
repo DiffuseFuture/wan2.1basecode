@@ -1260,7 +1260,7 @@ def main():
                     ])
                     print(f"[from {accelerator.process_index}]after transformer compose")
                 new_examples["pixel_values"].append(transform(pixel_values))
-                print(f"[from {accelerator.process_index}]new pixel values: {new_examples['pixel_values'].shape}")
+                print(f"[from {accelerator.process_index}]new pixel values: {new_examples['pixel_values'][-1].shape}")
                 new_examples["text"].append(example["text"])
 
                 batch_video_length = int(min(batch_video_length, len(pixel_values)))
