@@ -1,6 +1,6 @@
 import os
 import sys
-from unicodedata import name
+import argparse
 
 import numpy as np
 import torch
@@ -15,48 +15,50 @@ for project_root in project_roots:
     sys.path.insert(0, project_root) if project_root not in sys.path else None
 
 from videox_fun.dist import set_multi_gpus_devices, shard_model
-from videox_fun.models import (AutoencoderKLWan, CLIPModel, WanT5EncoderModel,
-                              WanTransformer3DModel)
+from videox_fun.models import (AutoencoderKLWan, AutoTokenizer, CLIPModel,
+                               WanT5EncoderModel, WanTransformer3DModel)
+from videox_fun.data.dataset_image_video import process_pose_file
 from videox_fun.models.cache_utils import get_teacache_coefficients
-from videox_fun.pipeline import WanFunInpaintPipeline
-from videox_fun.utils.fp8_optimization import (convert_model_weight_to_float8, replace_parameters_by_name,
-                                              convert_weight_dtype_wrapper)
+from videox_fun.pipeline import WanFunControlPipeline, WanPipeline
+from videox_fun.utils.fp8_optimization import (convert_model_weight_to_float8,
+                                               convert_weight_dtype_wrapper,
+                                               replace_parameters_by_name)
 from videox_fun.utils.lora_utils import merge_lora, unmerge_lora
-from videox_fun.utils.utils import (filter_kwargs, get_image_to_video_latent,
-                                   save_videos_grid)
+from videox_fun.utils.utils import (filter_kwargs, get_image_to_video_latent, get_image_latent,
+                                    get_video_to_video_latent,
+                                    save_videos_grid)
 from videox_fun.utils.fm_solvers import FlowDPMSolverMultistepScheduler
 from videox_fun.utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
 
 # GPU memory mode, which can be choosen in [model_full_load, model_full_load_and_qfloat8, model_cpu_offload, model_cpu_offload_and_qfloat8, sequential_cpu_offload].
 # model_full_load means that the entire model will be moved to the GPU.
-# 
+#
 # model_full_load_and_qfloat8 means that the entire model will be moved to the GPU,
-# and the transformer model has been quantized to float8, which can save more GPU memory. 
-# 
+# and the transformer model has been quantized to float8, which can save more GPU memory.
+#
 # model_cpu_offload means that the entire model will be moved to the CPU after use, which can save some GPU memory.
-# 
-# model_cpu_offload_and_qfloat8 indicates that the entire model will be moved to the CPU after use, 
-# and the transformer model has been quantized to float8, which can save more GPU memory. 
-# 
-# sequential_cpu_offload means that each layer of the model will be moved to the CPU after use, 
+#
+# model_cpu_offload_and_qfloat8 indicates that the entire model will be moved to the CPU after use,
+# and the transformer model has been quantized to float8, which can save more GPU memory.
+#
+# sequential_cpu_offload means that each layer of the model will be moved to the CPU after use,
 # resulting in slower speeds but saving a large amount of GPU memory.
-# GPU_memory_mode     = "sequential_cpu_offload"
-GPU_memory_mode = "model_full_load"
+GPU_memory_mode     = "sequential_cpu_offload"
 # Multi GPUs config
-# Please ensure that the product of ulysses_degree and ring_degree equals the number of GPUs used. 
+# Please ensure that the product of ulysses_degree and ring_degree equals the number of GPUs used.
 # For example, if you are using 8 GPUs, you can set ulysses_degree = 2 and ring_degree = 4.
 # If you are using 1 GPU, you can set ulysses_degree = 1 and ring_degree = 1.
-ulysses_degree      = 8
+ulysses_degree      = 1
 ring_degree         = 1
 # Use FSDP to save more GPU memory in multi gpus.
 fsdp_dit            = False
-# Compile will give a speedup in fixed resolution and need a little GPU memory. 
+# Compile will give a speedup in fixed resolution and need a little GPU memory.
 # The compile_dit is not compatible with the fsdp_dit.
 compile_dit         = False
 
 # Support TeaCache.
 enable_teacache     = True
-# Recommended to be set between 0.05 and 0.20. A larger threshold can cache more steps, speeding up the inference process, 
+# Recommended to be set between 0.05 and 0.20. A larger threshold can cache more steps, speeding up the inference process,
 # but it may cause slight differences between the generated content and the original content.
 teacache_threshold  = 0.10
 # The number of steps to skip TeaCache at the beginning of the inference process, which can
@@ -65,7 +67,7 @@ num_skip_start_steps = 5
 # Whether to offload TeaCache tensors to cpu to save a little bit of GPU memory.
 teacache_offload    = False
 
-# Skip some cfg steps in inference
+# Skip some cfg steps in inference for acceleration
 # Recommended to be set between 0.00 and 0.25
 cfg_skip_ratio      = 0
 
@@ -77,15 +79,15 @@ riflex_k            = 6
 # Config and model path
 config_path         = "config/wan2.1/wan_civitai.yaml"
 # model path
-model_name          = "/data/wan2.1basecode/VideoX-Fun/models/Wan2.1-Fun-V1.1-14B-InP"
+model_name          = "models/Diffusion_Transformer/Wan2.1-Fun-V1.1-1.3B-Control"
 
 # Choose the sampler in "Flow", "Flow_Unipc", "Flow_DPM++"
 sampler_name        = "Flow"
-# [NOTE]: Noise schedule shift parameter. Affects temporal dynamics. 
+# [NOTE]: Noise schedule shift parameter. Affects temporal dynamics.
 # Used when the sampler is in "Flow_Unipc", "Flow_DPM++".
 # If you want to generate a 480p video, it is recommended to set the shift value to 3.0.
 # If you want to generate a 720p video, it is recommended to set the shift value to 5.0.
-shift               = 3 
+shift               = 3
 
 # Load pretrained model if need
 transformer_path    = None
@@ -93,52 +95,56 @@ vae_path            = None
 lora_path           = None
 
 # Other params
-sample_size         = [480, 832]
-video_length        = 81
+sample_size         = [832, 480]
+video_length        = 49
 fps                 = 16
 
+# Use torch.float16 if GPU does not support torch.bfloat16
+# ome graphics cards, such as v100, 2080ti, do not support torch.bfloat16
+weight_dtype            = torch.bfloat16
 
-import argparse
+# 使用更长的neg prompt如"模糊，突变，变形，失真，画面暗，文本字幕，画面固定，连环画，漫画，线稿，没有主体。"，可以增加稳定性
+# 在neg prompt中添加"安静，固定"等词语可以增加动态性。
+negative_prompt     = "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走"
+
+# Using longer neg prompt such as "Blurring, mutation, deformation, distortion, dark and solid, comics, text subtitles, line art." can increase stability
+# Adding words such as "quiet, solid" to the neg prompt can increase dynamism.
+guidance_scale          = 6.0
+seed                    = 43
+num_inference_steps     = 50
+lora_weight             = 0.55
+save_path               = "samples/wan-videos-fun-control"
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="示例脚本参数解析")
+    parser = argparse.ArgumentParser(description="批量推理脚本参数解析")
 
-    # 添加参数示例
     parser.add_argument(
-        "--ref", 
+        "--control_videos", 
         type=str, 
-        default="asset/1.png",
-        help="参考图"
+        nargs='+',
+        required=False,
+        help="控制视频路径列表"
     )
 
     parser.add_argument(
-        "--prompt", 
+        "--ref_images", 
         type=str, 
-        default="一只棕色的狗摇着头，坐在舒适房间里的浅色沙发上。在狗的后面，架子上有一幅镶框的画，周围是粉红色的花朵。房间里柔和温暖的灯光营造出舒适的氛围。", 
-        help="提示词"
+        nargs='+',
+        required=False,
+        help="参考图片路径列表"
+    )
+
+    parser.add_argument(
+        "--save_path", 
+        type=str, 
+        default="samples/wan-videos-fun-control",
+        help="保存路径"
     )
 
     return parser.parse_args()
 
 args = parse_args()
-# Use torch.float16 if GPU does not support torch.bfloat16
-# ome graphics cards, such as v100, 2080ti, do not support torch.bfloat16
-weight_dtype            = torch.bfloat16
-# If you want to generate from text, please set the validation_image_start = None and validation_image_end = None
-# validation_image_start  = args.ref
-validation_image_end    = None
-
-
-# prompts
-# prompt              = args.prompt
-# print("=======type=======",type(args.ref))
-negative_prompt     = "色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走"
-guidance_scale      = 6.0
-seed                = 43
-num_inference_steps = 50
-lora_weight         = 0.55
-save_path           = "samples/wan-videos-fun-i2v"
-# save_name = args.ref.split("/")[-1][:-4]
+save_path = args.save_path
 
 device = set_multi_gpus_devices(ulysses_degree, ring_degree)
 config = OmegaConf.load(config_path)
@@ -213,7 +219,7 @@ scheduler = Choosen_Scheduler(
 )
 
 # Get Pipeline
-pipeline = WanFunInpaintPipeline(
+pipeline = WanFunControlPipeline(
     transformer=transformer,
     vae=vae,
     tokenizer=tokenizer,
@@ -258,7 +264,7 @@ if coefficients is not None:
         coefficients, num_inference_steps, teacache_threshold, num_skip_start_steps=num_skip_start_steps, offload=teacache_offload
     )
 
-def save_results(sample,save_name=""):
+def save_results(sample, save_name=""):
     if not os.path.exists(save_path):
         os.makedirs(save_path, exist_ok=True)
 
@@ -274,15 +280,14 @@ def save_results(sample,save_name=""):
         image.save(video_path)
     else:
         video_path = os.path.join(save_path, save_name + ".mp4")
-        print("===save_path====",video_path)
+        print("===save_path====", video_path)
         save_videos_grid(sample, video_path, fps=fps)
 
-
-def run_once(pipeline,prompt="",validation_image_start=""):
+def run_once(pipeline, control_video="", ref_image=""):
     generator = torch.Generator(device=device).manual_seed(seed)
 
     if lora_path is not None:
-        pipeline = merge_lora(pipeline, lora_path, lora_weight)
+        pipeline = merge_lora(pipeline, lora_path, lora_weight, device=device)
 
     global video_length
     with torch.no_grad():
@@ -292,10 +297,20 @@ def run_once(pipeline,prompt="",validation_image_start=""):
         if enable_riflex:
             pipeline.transformer.enable_riflex(k = riflex_k, L_test = latent_frames)
 
-        input_video, input_video_mask, clip_image = get_image_to_video_latent(validation_image_start, validation_image_end, video_length=video_length, sample_size=sample_size)
+        # 处理参考图片
+        if ref_image is not None:
+            clip_image = Image.open(ref_image).convert("RGB")
+            ref_image_latent = get_image_latent(ref_image, sample_size=sample_size)
+        else:
+            clip_image = None
+            ref_image_latent = None
+
+        # 处理控制视频
+        input_video, input_video_mask, _, _ = get_video_to_video_latent(control_video, video_length=video_length, sample_size=sample_size, fps=fps, ref_image=None)
+        control_camera_video = None
 
         sample = pipeline(
-            prompt, 
+            "",  # 不输入prompt
             num_frames = video_length,
             negative_prompt = negative_prompt,
             height      = sample_size[0],
@@ -304,37 +319,58 @@ def run_once(pipeline,prompt="",validation_image_start=""):
             guidance_scale = guidance_scale,
             num_inference_steps = num_inference_steps,
 
-            video      = input_video,
-            mask_video   = input_video_mask,
+            control_video = input_video,
+            control_camera_video = control_camera_video,
+            ref_image = ref_image_latent,
+            start_image = None,
             clip_image = clip_image,
             cfg_skip_ratio = cfg_skip_ratio,
             shift = shift,
         ).videos
 
     if lora_path is not None:
-        pipeline = unmerge_lora(pipeline, lora_path, lora_weight)
-
+        pipeline = unmerge_lora(pipeline, lora_path, lora_weight, device=device)
 
     if ulysses_degree * ring_degree > 1:
         import torch.distributed as dist
         if dist.get_rank() == 0:
-            save_results(sample,save_name=validation_image_start.split("/")[-1][:-4])
+            control_name = os.path.basename(control_video).split('.')[0]
+            ref_name = os.path.basename(ref_image).split('.')[0] if ref_image else "no_ref"
+            save_name = f"{control_name}_{ref_name}"
+            save_results(sample, save_name=save_name)
     else:
-        save_results(sample,save_name=validation_image_start.split("/")[-1][:-4])
+        control_name = os.path.basename(control_video).split('.')[0]
+        ref_name = os.path.basename(ref_image).split('.')[0] if ref_image else "no_ref"
+        save_name = f"{control_name}_{ref_name}"
+        save_results(sample, save_name=save_name)
 
 
-import json
-if __name__ == "__main__":
-    f = open("/data/jiangxx/wan2.1basecode/VideoX-Fun/benchmark/test.json", "r")
-    data = f.read()
-    test_data = json.loads(data)
-    sorted_data = sorted(test_data, key=lambda x: x["file_path"])
-
-    for item in sorted_data:
-        file_path = item["file_path"]
-        vname = file_path.split("/")[-1]
-        prompt = item["text"]
+def main():
+    control_videos = [f"/data/jiangxx/samples/control_videos/{i}_control.mp4" for i in range(1, 11, 1)]
+    ref_images = [f"/data/jiangxx/samples/ref_images/{i}.jpg" for i in range(1, 11, 1)]
+    # ref_images = args.ref_images
+    
+    print(f"开始批量推理，控制视频数量: {len(control_videos)}, 参考图片数量: {len(ref_images)}")
+    
+    # 确保两个列表长度一致
+    if len(control_videos) != len(ref_images):
+        print("警告：控制视频列表和参考图片列表长度不一致，将使用较短的列表长度")
+        min_length = min(len(control_videos), len(ref_images))
+        control_videos = control_videos[:min_length]
+        ref_images = ref_images[:min_length]
+    
+    for i, (control_video, ref_image) in enumerate(zip(control_videos, ref_images)):
+        print(f"==============处理第 {i+1}/{len(control_videos)} 组============")
+        print(f"控制视频: {control_video}")
+        print(f"参考图片: {ref_image}")
         
-        print("==============Processing {}============".format(vname))
-        run_once(pipeline, prompt=prompt, validation_image_start="/data/jiangxx/wan2.1basecode/VideoX-Fun/benchmark/start_frames/{}".format(vname[:-4]+".jpg"))
+        try:
+            run_once(pipeline, control_video=control_video, ref_image=ref_image)
+            print(f"第 {i+1} 组处理完成")
+        except Exception as e:
+            print(f"第 {i+1} 组处理失败: {str(e)}")
+            continue
 
+
+if __name__ == "__main__":
+    main()
