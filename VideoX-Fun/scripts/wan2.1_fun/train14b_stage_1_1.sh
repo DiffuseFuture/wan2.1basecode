@@ -35,7 +35,7 @@ accelerate launch --num_machines 2 --num_processes 16 --machine_rank ${RANK} --m
   --dataloader_num_workers=8 \
   --num_train_epochs=100 \
   --checkpointing_steps=100 \
-  --learning_rate=2e-05 \
+  --learning_rate=5e-06 \
   --lr_scheduler="constant_with_warmup" \
   --lr_warmup_steps=100 \
   --seed=42 \

@@ -416,11 +416,14 @@ class ImageVideoDataset(Dataset):
                     self.video_sample_n_frames, 
                     int(len(video_reader) * (self.video_length_drop_end - self.video_length_drop_start) // self.video_sample_stride)
                 )
+                print(f"min sample n frames: {min_sample_n_frames}")
                 if min_sample_n_frames == 0:
                     raise ValueError(f"No Frames in video.")
 
                 video_length = int(self.video_length_drop_end * len(video_reader))
+                print(f"video length: {video_length}")
                 clip_length = min(video_length, (min_sample_n_frames - 1) * self.video_sample_stride + 1)
+                print(f"clip length: {clip_length}")
                 start_idx   = random.randint(int(self.video_length_drop_start * video_length), video_length - clip_length) if video_length != clip_length else 0
                 batch_index = np.linspace(start_idx, start_idx + clip_length - 1, min_sample_n_frames, dtype=int)
 
