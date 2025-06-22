@@ -20,11 +20,12 @@ from einops import rearrange
 from PIL import Image
 from transformers import T5Tokenizer
 
-from ..models import (AutoencoderKLWan, AutoTokenizer, CLIPModel,
-                              WanT5EncoderModel, WanTransformer3DModel)
+from ..models import (AutoencoderKLWan, CLIPModel,WanT5EncoderModel,
+                               WanTransformer3DModel)
 from ..utils.fm_solvers import (FlowDPMSolverMultistepScheduler,
                                 get_sampling_sigmas)
 from ..utils.fm_solvers_unipc import FlowUniPCMultistepScheduler
+from transformers import AutoModel, AutoTokenizer
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -169,13 +170,14 @@ class WanFunControlPipeline(DiffusionPipeline):
     def __init__(
         self,
         tokenizer: AutoTokenizer,
-        text_encoder: WanT5EncoderModel,
+        text_encoder: AutoModel,
         vae: AutoencoderKLWan,
         transformer: WanTransformer3DModel,
         clip_image_encoder: CLIPModel,
         scheduler: FlowMatchEulerDiscreteScheduler,
     ):
         super().__init__()
+
 
         self.register_modules(
             tokenizer=tokenizer, text_encoder=text_encoder, vae=vae, transformer=transformer, clip_image_encoder=clip_image_encoder, scheduler=scheduler
@@ -186,6 +188,8 @@ class WanFunControlPipeline(DiffusionPipeline):
         self.mask_processor = VaeImageProcessor(
             vae_scale_factor=self.vae.spacial_compression_ratio, do_normalize=False, do_binarize=True, do_convert_grayscale=True
         )
+        
+
 
     def _get_t5_prompt_embeds(
         self,
@@ -195,6 +199,9 @@ class WanFunControlPipeline(DiffusionPipeline):
         device: Optional[torch.device] = None,
         dtype: Optional[torch.dtype] = None,
     ):
+        
+
+                
         device = device or self._execution_device
         dtype = dtype or self.text_encoder.dtype
 
@@ -221,7 +228,7 @@ class WanFunControlPipeline(DiffusionPipeline):
             )
 
         seq_lens = prompt_attention_mask.gt(0).sum(dim=1).long()
-        prompt_embeds = self.text_encoder(text_input_ids.to(device), attention_mask=prompt_attention_mask.to(device))[0]
+        prompt_embeds = self.model(text_input_ids.to(device), attention_mask=prompt_attention_mask.to(device))[0]
         prompt_embeds = prompt_embeds.to(dtype=dtype, device=device)
 
         # duplicate text embeddings for each generation per prompt, using mps friendly method
@@ -230,6 +237,64 @@ class WanFunControlPipeline(DiffusionPipeline):
         prompt_embeds = prompt_embeds.view(batch_size * num_videos_per_prompt, seq_len, -1)
 
         return [u[:v] for u, v in zip(prompt_embeds, seq_lens)]
+
+    # def _get_qwen2_prompt_embeds(
+    #     self,
+    #     prompt: Union[str, List[str]] = None,
+    #     num_videos_per_prompt: int = 1,
+    #     max_sequence_length: int = 512,
+    #     device: Optional[torch.device] = None,
+    #     dtype: Optional[torch.dtype] = None,
+    # ):
+    #     device = device or self._execution_device
+    #     dtype = dtype or self.text_encoder.dtype
+
+    #     # 确保prompt是列表形式
+    #     prompt = [prompt] if isinstance(prompt, str) else prompt
+    #     batch_size = len(prompt)
+
+    #     # 使用Qwen2的tokenizer处理输入
+    #     text_inputs = self.tokenizer(
+    #         prompt,
+    #         padding="max_length",
+    #         max_length=max_sequence_length,
+    #         truncation=True,
+    #         add_special_tokens=True,
+    #         return_tensors="pt",
+    #     )
+    #     text_input_ids = text_inputs.input_ids
+    #     prompt_attention_mask = text_inputs.attention_mask
+
+    #     # 检查是否有被截断的文本
+    #     untruncated_ids = self.tokenizer(prompt, padding="longest", return_tensors="pt").input_ids
+    #     if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not torch.equal(text_input_ids, untruncated_ids):
+    #         removed_text = self.tokenizer.batch_decode(untruncated_ids[:, max_sequence_length - 1 : -1])
+    #         logger.warning(
+    #             "The following part of your input was truncated because `max_sequence_length` is set to "
+    #             f"{max_sequence_length} tokens: {removed_text}"
+    #         )
+
+    #     # 获取有效序列长度
+    #     seq_lens = prompt_attention_mask.gt(0).sum(dim=1).long()
+
+    #     # 使用Qwen2模型获取prompt嵌入
+    #     with torch.no_grad():
+    #         outputs = self.model(
+    #             input_ids=text_input_ids.to(device),
+    #             attention_mask=prompt_attention_mask.to(device),
+    #             output_hidden_states=True
+    #         )
+    #         # 获取最后一层隐藏状态
+    #         prompt_embeds = outputs.hidden_states[-1]
+    #         prompt_embeds = prompt_embeds.to(dtype=dtype, device=device)
+
+    #     # 为每个prompt复制嵌入以匹配视频数量
+    #     _, seq_len, hidden_size = prompt_embeds.shape
+    #     prompt_embeds = prompt_embeds.repeat(1, num_videos_per_prompt, 1)
+    #     prompt_embeds = prompt_embeds.view(batch_size * num_videos_per_prompt, seq_len, hidden_size)
+
+    #     # 根据实际序列长度截取有效部分
+    #     return [u[:v] for u, v in zip(prompt_embeds, seq_lens)]
 
     def encode_prompt(
         self,
@@ -277,6 +342,16 @@ class WanFunControlPipeline(DiffusionPipeline):
         else:
             batch_size = prompt_embeds.shape[0]
 
+        # qwen
+        # if prompt_embeds is None:
+        #     prompt_embeds = self._get_qwen2_prompt_embeds(
+        #         prompt=prompt,
+        #         num_videos_per_prompt=num_videos_per_prompt,
+        #         max_sequence_length=max_sequence_length,
+        #         device=device,
+        #         dtype=dtype,
+        #     )
+
         if prompt_embeds is None:
             prompt_embeds = self._get_t5_prompt_embeds(
                 prompt=prompt,
@@ -301,6 +376,14 @@ class WanFunControlPipeline(DiffusionPipeline):
                     f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
                     " the batch size of `prompt`."
                 )
+            # qwen
+            # negative_prompt_embeds = self._get_qwen2_prompt_embeds(
+            #     prompt=negative_prompt,
+            #     num_videos_per_prompt=num_videos_per_prompt,
+            #     max_sequence_length=max_sequence_length,
+            #     device=device,
+            #     dtype=dtype,
+            # )
 
             negative_prompt_embeds = self._get_t5_prompt_embeds(
                 prompt=negative_prompt,
@@ -309,6 +392,7 @@ class WanFunControlPipeline(DiffusionPipeline):
                 device=device,
                 dtype=dtype,
             )
+            
 
         return prompt_embeds, negative_prompt_embeds
 
@@ -497,6 +581,7 @@ class WanFunControlPipeline(DiffusionPipeline):
         clip_image: Image = None,
         max_sequence_length: int = 512,
         comfyui_progressbar: bool = False,
+        cfg_skip_ratio: int = None,
         shift: int = 5,
     ) -> Union[WanPipelineOutput, Tuple]:
         """
@@ -702,10 +787,11 @@ class WanFunControlPipeline(DiffusionPipeline):
         seq_len = math.ceil((target_shape[2] * target_shape[3]) / (self.transformer.config.patch_size[1] * self.transformer.config.patch_size[2]) * target_shape[1]) 
         # 7. Denoising loop
         num_warmup_steps = max(len(timesteps) - num_inference_steps * self.scheduler.order, 0)
-        self.transformer.num_inference_steps = num_inference_steps
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
-                self.transformer.current_steps = i
+                if cfg_skip_ratio is not None and i >= num_inference_steps * (1 - cfg_skip_ratio):
+                    do_classifier_free_guidance = False
+                    in_prompt_embeds = prompt_embeds
 
                 if self.interrupt:
                     continue
