@@ -497,6 +497,7 @@ class WanFunControlPipeline(DiffusionPipeline):
         clip_image: Image = None,
         max_sequence_length: int = 512,
         comfyui_progressbar: bool = False,
+        cfg_skip_ratio: int = None,
         shift: int = 5,
     ) -> Union[WanPipelineOutput, Tuple]:
         """
@@ -706,7 +707,9 @@ class WanFunControlPipeline(DiffusionPipeline):
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
                 self.transformer.current_steps = i
-
+                if cfg_skip_ratio is not None and i >= num_inference_steps * (1 - cfg_skip_ratio):
+                    do_classifier_free_guidance = False
+                    in_prompt_embeds = prompt_embeds
                 if self.interrupt:
                     continue
 
