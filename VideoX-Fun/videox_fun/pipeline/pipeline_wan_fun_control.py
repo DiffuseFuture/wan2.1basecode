@@ -342,8 +342,18 @@ class WanFunControlPipeline(DiffusionPipeline):
         else:
             batch_size = prompt_embeds.shape[0]
 
+        # qwen
+        # if prompt_embeds is None:
+        #     prompt_embeds = self._get_qwen2_prompt_embeds(
+        #         prompt=prompt,
+        #         num_videos_per_prompt=num_videos_per_prompt,
+        #         max_sequence_length=max_sequence_length,
+        #         device=device,
+        #         dtype=dtype,
+        #     )
+
         if prompt_embeds is None:
-            prompt_embeds = self._get_qwen2_prompt_embeds(
+            prompt_embeds = self._get_t5_prompt_embeds(
                 prompt=prompt,
                 num_videos_per_prompt=num_videos_per_prompt,
                 max_sequence_length=max_sequence_length,
@@ -366,14 +376,23 @@ class WanFunControlPipeline(DiffusionPipeline):
                     f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
                     " the batch size of `prompt`."
                 )
+            # qwen
+            # negative_prompt_embeds = self._get_qwen2_prompt_embeds(
+            #     prompt=negative_prompt,
+            #     num_videos_per_prompt=num_videos_per_prompt,
+            #     max_sequence_length=max_sequence_length,
+            #     device=device,
+            #     dtype=dtype,
+            # )
 
-            negative_prompt_embeds = self._get_qwen2_prompt_embeds(
+            negative_prompt_embeds = self._get_t5_prompt_embeds(
                 prompt=negative_prompt,
                 num_videos_per_prompt=num_videos_per_prompt,
                 max_sequence_length=max_sequence_length,
                 device=device,
                 dtype=dtype,
             )
+            
 
         return prompt_embeds, negative_prompt_embeds
 
