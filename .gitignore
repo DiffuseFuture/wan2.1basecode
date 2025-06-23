@@ -9,3 +9,5 @@ VideoX-Fun/test/
 *.pyc
 **/__pycache__/**
 .vscode*
+VideoX-Fun/cases.zip
+VideoX-Fun/.idea/*
