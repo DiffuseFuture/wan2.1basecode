@@ -7,6 +7,7 @@
 - **PSNR**（Peak Signal-to-Noise Ratio）
 - **LPIPS**（Learned Perceptual Image Patch Similarity）
 - **FVD**（Fréchet Video Distance）
+- **SSIM**（Structural Similarity Index Measure）
 
 ![指标示意图](../asset/metrics.png)
 
