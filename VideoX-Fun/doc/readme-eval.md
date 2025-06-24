@@ -45,6 +45,7 @@ python VideoX-Fun/eval_benchmark.py --root_predict ./VideoX-Fun/samples/wan-vide
 - `--root_predict`：生成的视频的根目录，默认为 `./VideoX-Fun/samples/wan-videos-fun-i2v/`
 - `--root_benchmark`：benchmark 视频所在目录，默认为 `./VideoX-Fun/benchmark/videos/`
 - 评估结果将被保存为 `eval_result.json`，全部视频的统计指标会被打印到控制台。
+- **评估fvd和lipips需要用到预训练模型，模型文件已经被lfs进行了管理. 评估前需要将文件拉取到本地**
 
 ---
 
