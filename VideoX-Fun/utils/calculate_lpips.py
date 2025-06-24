@@ -10,10 +10,10 @@ import evaluation.lpips as lpips
 import warnings
 warnings.filterwarnings("ignore")
 
-spatial = True         # Return a spatial map of perceptual distance.
+# spatial = True         # Return a spatial map of perceptual distance.
 
 # Linearly calibrated models (LPIPS)
-loss_fn = lpips.LPIPS(net='alex', spatial=spatial) # Can also set net = 'squeeze' or 'vgg'
+# loss_fn = lpips.LPIPS(net='alex', spatial=spatial) # Can also set net = 'squeeze' or 'vgg'
 # loss_fn = lpips.LPIPS(net='alex', spatial=spatial, lpips=False) # Can also set net = 'squeeze' or 'vgg'
 
 def trans(x):
@@ -26,7 +26,7 @@ def trans(x):
 
     return x
 
-def calculate_lpips(videos1, videos2, device, only_final=False):
+def calculate_lpips(videos1, videos2, device, only_final=False, loss_fn=None):
     # image should be RGB, IMPORTANT: normalized to [-1,1]
     print("calculate_lpips...")
 
