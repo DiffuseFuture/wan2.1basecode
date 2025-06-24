@@ -3,6 +3,8 @@ from utils.calculate_fvd import calculate_fvd
 from utils.calculate_psnr import calculate_psnr
 from utils.calculate_ssim import calculate_ssim
 from utils.calculate_lpips import calculate_lpips
+from evaluation.fvd.styleganv.fvd import load_i3d_pretrained
+import evaluation.lpips as lpips
 
 from torch.utils.data import DataLoader
 from utils.util import VideoPairDataset 
@@ -33,7 +35,9 @@ args = parse_args()
 if __name__ == "__main__":
     dataset = VideoPairDataset(root_benchmark=args.root_benchmark,root_predict=args.root_predict, sequence_len=15)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True, num_workers=0)
-
+    i3d = load_i3d_pretrained(device=device)
+    loss_fn = lpips.LPIPS(net='alex', spatial=True) # Can also set net = 'squeeze' or 'vgg'
+    
     results = []
     for videos1, videos2 in dataloader:
         result = {}
@@ -41,10 +45,10 @@ if __name__ == "__main__":
         # inputs and targets are [batch_size, sequence_len, 64, 64, 3]
         print(videos1.shape, videos2.shape)
 
-        result['fvd'] = calculate_fvd(videos1, videos2, device, method='styleganv', only_final=only_final)
+        result['fvd'] = calculate_fvd(videos1, videos2, device, method='styleganv', only_final=only_final, i3d=i3d)
         result['ssim'] = calculate_ssim(videos1, videos2, only_final=only_final)
         result['psnr'] = calculate_psnr(videos1, videos2, only_final=only_final)
-        result['lpips'] = calculate_lpips(videos1, videos2, device, only_final=only_final)
+        result['lpips'] = calculate_lpips(videos1, videos2, device, only_final=only_final, loss_fn=loss_fn)
         results.append(result)
     
     # 每段视频的metric会被保存在result.json中
