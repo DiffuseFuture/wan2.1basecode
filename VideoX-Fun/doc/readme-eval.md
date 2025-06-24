@@ -25,7 +25,7 @@ torchrun --nproc-per-node=2 VideoX-Fun/examples/wan2.1_fun/predict_i2v_benchmark
 #### 参数说明：
 
 - `--nproc-per-node`：使用的 GPU 数量。例如设置为 `8` 表示并行使用 8 个 GPU。
-- `ulysses_degree`：在 `predict_i2v_benchmark.py` 中同步设置为所用 GPU 数量。
+- `ulysses_degree` (第49行)：在 `predict_i2v_benchmark.py` 中同步设置为所用 GPU 数量。
 - `model_name`（第 80 行）：指定模型路径，**建议使用绝对路径**，训练好的模型需要放置在指定的模型路径中，替换原有的 `diffusion_pytorch_model.safetensor` 文件。
 - `save_path`（第 140 行）：指定生成视频的保存目录。
 
@@ -47,4 +47,4 @@ python VideoX-Fun/eval_benchmark.py --root_predict ./VideoX-Fun/samples/wan-vide
 
 ---
 
-如有问题，欢迎提交 Issue 或联系维护者。
+如有问题，联系xiatao@bit.edu.cn
